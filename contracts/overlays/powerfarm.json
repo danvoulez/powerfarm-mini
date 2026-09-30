@@ -1,0 +1,18 @@
+{
+  "operations": {
+    "system.dashboard": { "group": "system", "method": "dashboard" },
+    "identity.entities.list": { "group": "identity.entities", "method": "list" },
+    "identity.entities.create": { "group": "identity.entities", "method": "create" },
+    "registry.artifacts.list": { "group": "identity.artifacts", "method": "list" },
+    "registry.artifacts.create": { "group": "identity.artifacts", "method": "create" },
+    "research.studies.list": { "group": "research.studies", "method": "list" },
+    "research.studies.create": { "group": "research.studies", "method": "create" },
+    "research.claims.list": { "group": "research.claims", "method": "list" },
+    "research.claims.create": { "group": "research.claims", "method": "create" },
+    "evidence.content.list": { "group": "evidence.content", "method": "list" },
+    "continuity.contracts.list": { "group": "continuity.contracts", "method": "list" },
+    "continuity.executions.list": { "group": "continuity.executions", "method": "list" },
+    "products.candidates.list": { "group": "products.candidates", "method": "list" },
+    "search.query": { "group": "search", "method": "query" }
+  }
+}

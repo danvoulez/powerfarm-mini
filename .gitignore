@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+.env
+var/powerfarm.db
+var/powerfarm.db-*
+var/test-*
+var/objects/*
+!var/objects/.gitkeep
+generated/*
+!generated/.gitkeep

@@ -1,0 +1,34 @@
+{
+  "name": "powerfarm-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "scripts": {
+    "dev": "node --no-warnings --experimental-strip-types apps/server/src/main.ts",
+    "server": "node --no-warnings --experimental-strip-types apps/server/src/main.ts",
+    "worker": "node --no-warnings --experimental-strip-types apps/server/src/worker.ts",
+    "cli": "node --no-warnings --experimental-strip-types apps/cli/src/pf.ts",
+    "mcp": "node --no-warnings --experimental-strip-types apps/mcp/src/server.ts",
+    "migrate": "node --no-warnings --experimental-strip-types scripts/migrate.ts",
+    "seed": "node --no-warnings --experimental-strip-types scripts/seed.ts",
+    "generate": "node --no-warnings --experimental-strip-types scripts/generate.ts",
+    "verify": "node --no-warnings --experimental-strip-types scripts/verify.ts",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.ts",
+    "export": "node --no-warnings --experimental-strip-types scripts/export-institution.ts",
+    "replay": "node --no-warnings --experimental-strip-types scripts/replay-institution.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "oxlint .",
+    "format": "oxfmt . --write",
+    "bootstrap": "npm run migrate && npm run seed && npm run generate"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {
+    "@types/node": "26.0.1",
+    "typescript": "6.0.3",
+    "oxfmt": "0.59.0",
+    "oxlint": "1.74.0"
+  }
+}

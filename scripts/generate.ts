@@ -1,0 +1,25 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { loadConfig } from "../packages/db/src/config.ts";
+import { createServices } from "../apps/server/src/services.ts";
+import { buildRouter } from "../apps/server/src/routes.ts";
+import { createOpenApi } from "../packages/api/src/openapi.ts";
+import { applyOverlay } from "../packages/compiler/src/overlay.ts";
+import { Compiler } from "../packages/compiler/src/source-file.ts";
+import { generateSdk, operationCatalog } from "../packages/compiler/src/generate-sdk.ts";
+import { capabilities } from "../packages/auth/src/capabilities.ts";
+
+const config=loadConfig();
+const services=createServices(config);
+const router=buildRouter(services);
+const openapi=createOpenApi(router.definitions(),config.publicUrl);
+const overlay=JSON.parse(readFileSync(join(config.rootDir,"contracts/overlays/powerfarm.json"),"utf8"));
+const resolved=applyOverlay(openapi,overlay);
+const compiler=new Compiler();
+compiler.emit("openapi.json",JSON.stringify(resolved,null,2)+"\n");
+compiler.emit("operations.json",JSON.stringify(operationCatalog(resolved),null,2)+"\n");
+compiler.emit("capabilities.json",JSON.stringify(capabilities,null,2)+"\n");
+compiler.emit("sdk.mjs",generateSdk(resolved));
+await compiler.finalize(join(config.rootDir,"generated"),compiler.drain(),true);
+services.db.close();
+console.log(`Generated ${operationCatalog(resolved).length} API operations into generated/`);
