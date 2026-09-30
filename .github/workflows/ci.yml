@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          # setup-node would otherwise try to cache for the "packageManager" (pnpm) before corepack
+          # has put pnpm on PATH, and fail. Installing the few dev dependencies needs no cache.
+          package-manager-cache: false
 
       # Installs the pnpm version pinned by "packageManager" in package.json.
       - run: corepack enable
