@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- GitHub Actions CI (`.github/workflows/ci.yml`): verify, typecheck, lint, tests and a bootstrap smoke test on every pull request and push to `main`. `pnpm-lock.yaml` pins dependencies for `--frozen-lockfile` installs.
+
 ### Fixed
 
 - A request URL with malformed percent-encoding no longer crashes the server; it returns `400`. The URL is parsed without trusting the `Host` header, and the request handler has a last-resort error boundary.
