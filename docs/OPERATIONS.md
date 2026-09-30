@@ -16,6 +16,14 @@ npm run worker
 
 The server can also execute one ready item explicitly through the UI, CLI, or API.
 
+The server and worker share the SQLite file. A writer waits up to 5 seconds for the other's lock before failing. If a worker dies mid-execution, the next claim by any worker recovers executions silent for more than five minutes (see `docs/ARCHITECTURE.md`).
+
+A contract only triggers when it is `armed` and ready. Check why a trigger was refused with:
+
+```bash
+curl -H "authorization: Bearer $TOKEN" http://127.0.0.1:4545/api/v1/executable-contracts/<id>/readiness
+```
+
 ## Environment
 
 | Variable | Default | Purpose |
@@ -24,7 +32,7 @@ The server can also execute one ready item explicitly through the UI, CLI, or AP
 | `POWERFARM_PORT` | `4545` | HTTP port |
 | `POWERFARM_DB` | `./var/powerfarm.db` | SQLite operational store |
 | `POWERFARM_OBJECTS` | `./var/objects` | immutable content root |
-| `POWERFARM_ADMIN_TOKEN` | local dev value | bootstrap administrator token |
+| `POWERFARM_ADMIN_TOKEN` | local dev value | bootstrap administrator token; required for any non-loopback host |
 | `POWERFARM_PUBLIC_URL` | derived local URL | OpenAPI server URL |
 
 ## Backup / institutional export
@@ -65,6 +73,8 @@ Generated files must not be edited manually.
 
 ```bash
 npm run verify
+npm run typecheck
+npm run lint
 npm test
 ```
 

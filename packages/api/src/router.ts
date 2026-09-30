@@ -5,10 +5,16 @@ import type { AuthService, Principal } from "../../auth/src/service.ts";
 
 export type BodyMode = "json" | "raw" | "none";
 
-export interface RequestContext {
+/** Names of the `:param` segments in a route path, e.g. "/studies/:id/runs" -> "id". */
+export type PathParams<Path extends string> =
+  Path extends `${string}:${infer Name}/${infer Rest}` ? Name | PathParams<`/${Rest}`>
+  : Path extends `${string}:${infer Name}` ? Name
+  : never;
+
+export interface RequestContext<Param extends string = string> {
   request: IncomingMessage;
   response: ServerResponse;
-  params: Record<string, string>;
+  params: Record<Param, string>;
   query: URLSearchParams;
   body: Record<string, unknown>;
   rawBody: Uint8Array;
@@ -23,11 +29,11 @@ export interface RouteResult {
   raw?: Uint8Array;
 }
 
-export type RouteHandler = (ctx: RequestContext) => Promise<RouteResult | unknown> | RouteResult | unknown;
+export type RouteHandler<Param extends string = string> = (ctx: RequestContext<Param>) => Promise<RouteResult | unknown> | RouteResult | unknown;
 
-export interface RouteDefinition {
+export interface RouteDefinition<Path extends string = string> {
   method: string;
-  path: string;
+  path: Path;
   operationId: string;
   summary: string;
   tag: string;
@@ -35,10 +41,11 @@ export interface RouteDefinition {
   public?: boolean;
   bodyMode?: BodyMode;
   maxBodyBytes?: number;
-  handler: RouteHandler;
+  handler: RouteHandler<PathParams<Path>>;
 }
 
-interface CompiledRoute extends RouteDefinition {
+interface CompiledRoute extends Omit<RouteDefinition, "handler"> {
+  handler: RouteHandler;
   regex: RegExp;
   paramNames: string[];
 }
@@ -53,6 +60,14 @@ function compilePath(path: string): { regex: RegExp; paramNames: string[] } {
     return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   });
   return { regex: new RegExp(`^${parts.join("/")}/?$`), paramNames };
+}
+
+export function decodePathSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    throw new AppError(400, "invalid_path", "Malformed percent-encoding in request path");
+  }
 }
 
 async function readBody(request: IncomingMessage, limit: number): Promise<Uint8Array> {
@@ -83,9 +98,11 @@ export class Router {
   readonly auth: AuthService;
   constructor(auth: AuthService) { this.auth = auth; }
 
-  route(definition: RouteDefinition): this {
+  route<const Path extends string>(definition: RouteDefinition<Path>): this {
     const { regex, paramNames } = compilePath(definition.path);
-    this.routes.push({ ...definition, method: definition.method.toUpperCase(), regex, paramNames });
+    // compilePath captures every `:param` in the path, so the handler always receives the params it declares.
+    const handler = definition.handler as RouteHandler;
+    this.routes.push({ ...definition, handler, method: definition.method.toUpperCase(), regex, paramNames });
     return this;
   }
 
@@ -94,18 +111,23 @@ export class Router {
   }
 
   async handle(request: IncomingMessage, response: ServerResponse): Promise<boolean> {
-    const host = request.headers.host ?? "127.0.0.1";
-    const url = new URL(request.url ?? "/", `http://${host}`);
+    // The Host header is client-controlled; only the path and query are used, so parse against a fixed base.
+    let url: URL;
+    try {
+      url = new URL(request.url ?? "/", "http://localhost");
+    } catch {
+      json(response, 400, { error: { code: "invalid_url", message: "Malformed request URL", details: null } });
+      return true;
+    }
     const method = (request.method ?? "GET").toUpperCase();
     const route = this.routes.find((candidate) => candidate.method === method && candidate.regex.test(url.pathname));
     if (!route) return false;
 
-    const match = route.regex.exec(url.pathname)!;
-    const params = Object.fromEntries(route.paramNames.map((name, i) => [name, decodeURIComponent(match[i + 1] ?? "")]));
-    const principal = this.auth.authenticate(request.headers.authorization);
-
     try {
+      const principal = this.auth.authenticate(request.headers.authorization);
       if (!route.public && route.capability) this.auth.require(principal, route.capability);
+      const match = route.regex.exec(url.pathname)!;
+      const params = Object.fromEntries(route.paramNames.map((name, i) => [name, decodePathSegment(match[i + 1] ?? "")]));
       const mode = route.bodyMode ?? (method === "GET" || method === "HEAD" ? "none" : "json");
       const rawBody = mode === "none" ? new Uint8Array() : await readBody(request, route.maxBodyBytes ?? 20 * 1024 * 1024);
       let body: Record<string, unknown> = {};
