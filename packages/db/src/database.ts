@@ -5,14 +5,20 @@ import { SCHEMA_VERSION, schemaSql } from "./schema.ts";
 
 export type SqlParam = string | number | bigint | Uint8Array | null;
 
+/** How long a connection waits for another writer (e.g. server vs. worker) before failing with SQLITE_BUSY. */
+export const BUSY_TIMEOUT_MS = 5000;
+
 export class Database {
   readonly path: string;
   readonly raw: DatabaseSync;
+  private depth = 0;
 
   constructor(path: string) {
     this.path = resolve(path);
     mkdirSync(dirname(this.path), { recursive: true });
     this.raw = new DatabaseSync(this.path);
+    // Must precede the schema/meta writes below, which can race another process opening the same file.
+    this.raw.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
     this.raw.exec(schemaSql);
     this.raw.prepare("INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version', ?)").run(String(SCHEMA_VERSION));
   }
@@ -32,15 +38,20 @@ export class Database {
     return this.raw.prepare(sql).run(...params) as { changes: number; lastInsertRowid: number | bigint };
   }
 
+  /** Runs `fn` atomically. Nested calls become savepoints, so services can compose transactional operations. */
   transaction<T>(fn: () => T): T {
-    this.raw.exec("BEGIN IMMEDIATE");
+    const savepoint = this.depth > 0 ? `sp_${this.depth}` : null;
+    this.raw.exec(savepoint ? `SAVEPOINT ${savepoint}` : "BEGIN IMMEDIATE");
+    this.depth++;
     try {
       const value = fn();
-      this.raw.exec("COMMIT");
+      this.raw.exec(savepoint ? `RELEASE ${savepoint}` : "COMMIT");
       return value;
     } catch (error) {
-      try { this.raw.exec("ROLLBACK"); } catch {}
+      try { this.raw.exec(savepoint ? `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}` : "ROLLBACK"); } catch {}
       throw error;
+    } finally {
+      this.depth--;
     }
   }
 }

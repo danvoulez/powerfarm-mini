@@ -4,6 +4,8 @@ import { extname, join, normalize, resolve } from "node:path";
 import type { RuntimeConfig } from "../../../packages/db/src/config.ts";
 import { createServices } from "./services.ts";
 import { buildRouter } from "./routes.ts";
+import { decodePathSegment } from "../../../packages/api/src/router.ts";
+import { AppError } from "../../../packages/core/src/errors.ts";
 
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -25,7 +27,7 @@ function applySecurityHeaders(response: ServerResponse): void {
 function serveStatic(request: IncomingMessage, response: ServerResponse, publicDir: string): boolean {
   if ((request.method ?? "GET") !== "GET") return false;
   const url = new URL(request.url ?? "/", "http://localhost");
-  let pathname = decodeURIComponent(url.pathname);
+  let pathname = decodePathSegment(url.pathname);
   if (pathname.startsWith("/api/")) return false;
   if (pathname === "/") pathname = "/index.html";
   const candidate = resolve(publicDir, `.${normalize(pathname)}`);
@@ -43,6 +45,15 @@ function serveStatic(request: IncomingMessage, response: ServerResponse, publicD
   return true;
 }
 
+function sendError(response: ServerResponse, status: number, code: string, message: string): void {
+  if (response.headersSent) {
+    response.destroy();
+    return;
+  }
+  response.writeHead(status, { "content-type": "application/json" });
+  response.end(JSON.stringify({ error: { code, message } }));
+}
+
 export function createServerApp(config: RuntimeConfig) {
   const services = createServices(config);
   const router = buildRouter(services);
@@ -50,16 +61,24 @@ export function createServerApp(config: RuntimeConfig) {
 
   const server = createServer(async (request, response) => {
     applySecurityHeaders(response);
-    if (request.method === "OPTIONS") {
-      response.writeHead(204, { "allow": "GET, POST, PATCH, PUT, DELETE, OPTIONS" });
-      response.end();
-      return;
+    try {
+      if (request.method === "OPTIONS") {
+        response.writeHead(204, { "allow": "GET, POST, PATCH, PUT, DELETE, OPTIONS" });
+        response.end();
+        return;
+      }
+      const handled = await router.handle(request, response);
+      if (handled) return;
+      if (serveStatic(request, response, publicDir)) return;
+      sendError(response, 404, "not_found", "Route not found");
+    } catch (error) {
+      // Last line of defence: a single bad request must never take the process down.
+      if (error instanceof AppError) sendError(response, error.status, error.code, error.message);
+      else {
+        console.error(error);
+        sendError(response, 500, "internal_error", "Internal server error");
+      }
     }
-    const handled = await router.handle(request, response);
-    if (handled) return;
-    if (serveStatic(request, response, publicDir)) return;
-    response.writeHead(404, { "content-type": "application/json" });
-    response.end(JSON.stringify({ error: { code: "not_found", message: "Route not found" } }));
   });
 
   return { server, services, router };

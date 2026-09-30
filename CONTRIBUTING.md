@@ -8,5 +8,5 @@
 6. Ensure a material recognized mutation has an institutional act and replay handling.
 7. Preserve immutable evidence by reference rather than copying it into arbitrary rows.
 8. Add deterministic verification for the intended change.
-9. Run `npm run verify && npm test && npm run generate`.
+9. Run `npm run verify && npm run typecheck && npm run lint && npm test && npm run generate`.
 10. If changing persistent/public contracts, document compatibility and recovery implications.

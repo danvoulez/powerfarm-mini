@@ -42,8 +42,8 @@ The bytes themselves are outside SQLite in the content-addressed object tree.
 
 - `evidence_signals`: temporal/observational evidence available to Powerfarm.
 - `execution_routes`: operational intelligence/execution configurations.
-- `executable_contracts`: persistent `T`, `O`, `pi`, `E`, `V` terms and generation.
-- `executions`: trigger, idempotency key, claim owner, causal state and failure.
+- `executable_contracts`: persistent `T`, `O`, `pi`, `E`, `V` terms, generation and status (`draft`, `armed`, `retired`).
+- `executions`: trigger, idempotency key, claim owner and time, causal state (`ready`, `claimed`, `executing`, `done`, `failed`, `uncertain`) and failure.
 - `execution_receipts`: effect observation plus verification state.
 - `outbox`: durable asynchronous delivery intent.
 

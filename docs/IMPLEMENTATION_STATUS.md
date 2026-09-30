@@ -9,7 +9,7 @@
 - SHA-256 content store with read-time and explicit verification;
 - benchmark instruments, tasks and test benches;
 - temporal and observational evidence signals;
-- executable contracts, idempotent triggers, atomic claim, safe built-in effects, receipts and verification;
+- executable contracts with armed/dormant/retired status, readiness (`T AND O`) evaluated over recorded evidence, `first_match`/`retrigger` policy, idempotent triggers, leased atomic claims, transactional built-in effects, receipts and verification;
 - product candidates and promotion;
 - decisions, incidents and institutional act history;
 - web, API, CLI and MCP surfaces;
@@ -19,6 +19,8 @@
 ## Deliberately not invented yet
 
 - global distributed scheduler/event bus;
+- automatic triggering when evidence changes (triggers are explicit requests gated by readiness and policy);
+- policy terms beyond `first_match`/`retrigger` (hold-for, expiration, retry eligibility, cancellation, compensation);
 - arbitrary remote network effects in Continuity;
 - proprietary graph language;
 - graph database requirement;

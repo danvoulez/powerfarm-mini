@@ -35,7 +35,7 @@ The local development bearer token is:
 powerfarm-local-admin
 ```
 
-Override it before any shared deployment:
+The server refuses to bind a non-loopback `POWERFARM_HOST` with this token. Override it before any shared deployment:
 
 ```bash
 export POWERFARM_ADMIN_TOKEN='a-long-random-secret'
@@ -58,8 +58,10 @@ npm run worker
 # Generate OpenAPI, operation catalog and SDK
 npm run generate
 
-# Verify source shape and run integration tests
+# Verify source shape, types and lint, then run integration tests
 npm run verify
+npm run typecheck
+npm run lint
 npm test
 ```
 

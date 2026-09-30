@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Verify, typecheck, lint, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          # setup-node would otherwise try to cache for the "packageManager" (pnpm) before corepack
+          # has put pnpm on PATH, and fail. Installing the few dev dependencies needs no cache.
+          package-manager-cache: false
+
+      # Installs the pnpm version pinned by "packageManager" in package.json.
+      - run: corepack enable
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run verify
+
+      - run: pnpm run typecheck
+
+      - run: pnpm run lint
+
+      - run: pnpm test
+
+      - name: Bootstrap smoke test (migrate, seed, generate)
+        run: pnpm run bootstrap
+        env:
+          POWERFARM_DB: ${{ runner.temp }}/powerfarm.db
+          POWERFARM_OBJECTS: ${{ runner.temp }}/objects

@@ -70,6 +70,20 @@ temporal evidence + observational evidence
 
 Executable contracts persist the semantic core `C=(T,O,pi,E,V)`. The worker's storage/locking mechanism is an implementation detail.
 
+`packages/continuity/src/readiness.ts` implements PF-03 Appendix A:
+
+- A contract is `draft` (dormant), `armed`, or `retired` (terminal). Only an armed contract can trigger.
+- `Ready = T AND O`, evaluated over recorded evidence signals. The platform clock reading used as `t_hat` is recorded with every evaluation rather than assumed.
+- Predicate terms: `always` (or `{}`), `all` (conjunction), `signal` (latest evidence of a kind/subject in the predicate's own domain, optionally no older than `withinSeconds` and equal to `equals`), `window` (temporal only: `notBefore`/`notAfter`), and `manual` (observational only: the explicit trigger request is the observed arrival).
+- Policy `pi`: `retrigger` (default) or `first_match` (one trigger per contract generation).
+- Unsupported terms are rejected when the contract is created; a stored term that is not understood evaluates as unsatisfied.
+
+A trigger request runs readiness, policy and execution creation in one transaction, and the `execution.triggered` act records the readiness and policy verdict that justified it. A refused trigger returns `409` with the readiness in `details`. `GET /api/v1/executable-contracts/:id/readiness` shows the current state (`dormant`, `waiting_temporal`, `waiting_observation`, `waiting_both`, `ready`, `retired`).
+
+Triggers are explicit requests; the platform does not yet evaluate contracts on its own when evidence arrives.
+
+Claims are leased. The next claim recovers any execution whose worker has been silent for five minutes: a `claimed` execution never started its effect and returns to `ready`; an `executing` one may have materialized and becomes `uncertain`. Both are recorded as `execution.lease.expired` acts.
+
 ## State and storage
 
 ### Relational operational state
@@ -133,7 +147,11 @@ Continuity deliberately supports only a small safe effect registry today:
 - `record.act`
 - `content.put-json`
 
-Network effects are not enabled by default. Adding one requires an explicit security and authority model rather than an arbitrary URL field.
+`record.act` may only record acts whose kind starts with `continuity.effect.`. Replay never interprets that namespace, so an effect cannot forge a grant, entity or other recognized mutation.
+
+Each built-in effect is local to the database (plus idempotent content-addressed bytes), so the effect, its verification and its receipt commit or roll back together. A failed execution therefore leaves no partial effect behind.
+
+Network effects are not enabled by default. Adding one requires an explicit security and authority model rather than an arbitrary URL field. Such an effect cannot share the receipt transaction: it must commit `executing` before acting, so an expired lease resolves it to `uncertain` rather than retrying it blindly.
 
 ## Replaceability boundaries
 
